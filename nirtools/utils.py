@@ -1,6 +1,5 @@
 import numpy as np
 import random
-from sklearn.metrics import r2_score
 # https://qiita.com/hmkz/items/0689cd85fb3e1adcda1a
 def decode(a, b):
     """decode for GA-WLS.
@@ -54,7 +53,7 @@ def translate(chromosome, n_features):
     indexes.sort()
     return truncate(indexes, 0, n_features-1)
 
-def evaluate(individual, X, y, model, score_func=r2_score):
+def evaluate(individual, X, y, model, score_func, *args, **kwargs):
     indexes = translate(individual, X.shape[1])
-    model.fit(X[:,indexes], y)
+    model.fit(X[:,indexes], y, *args, **kwargs)
     return score_func(y, model.predict(X[:,indexes])),

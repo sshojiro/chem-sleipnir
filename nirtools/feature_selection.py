@@ -2,19 +2,32 @@ import random
 from copy import deepcopy
 from deap import base, creator, tools
 import logging
-logging.basicConfig(format='%(name)s:%(level)s [%(asctime)s]| %(message)s',
-    level=logging.DEBUG)
+
+from sklearn.metrics import r2_score
+logging.basicConfig(format='%(name)s:%(levelname)s [%(asctime)s]| %(message)s',
+    level=logging.INFO)
 import numpy as np
 from sklearn.base import BaseEstimator
 from tqdm import tqdm
 from nirtools.utils import translate, generate_start_width, evaluate
 
-def init_creator():
-    creator.create("FitnessMax", base.Fitness, weights=(1.0, ))
-    creator.create("Individual", list, fitness=creator.FitnessMax)
+from enum import Enum
+
+class OPT(Enum):
+    MINIMIZE = 1
+    MAXIMIZE = 2
+
+def init_creator(optimization:OPT):
+    if optimization == OPT.MAXIMIZE:
+        creator.create("FitnessMax", base.Fitness, weights=(1.0, ))
+        creator.create("Individual", list, fitness=creator.FitnessMax)
+    elif optimization == OPT.MINIMIZE:
+        creator.create("FitnessMin", base.Fitness, weights=(-1.0, ))
+        creator.create("Individual", list, fitness=creator.FitnessMin)
     return creator
 
-def create_toolbox(creator, max_width, n_features, n_regions, X, y, base_model):
+def create_toolbox(creator, max_width, n_features, n_regions, X, y, base_model,
+        score_func, *args, **kwargs):
     toolbox = base.Toolbox()
     toolbox.register("attribute", lambda:generate_start_width(n_features, max_width))
     toolbox.register("individual", tools.initRepeat, creator.Individual,
@@ -24,7 +37,9 @@ def create_toolbox(creator, max_width, n_features, n_regions, X, y, base_model):
     toolbox.register("mate", tools.cxTwoPoint)
     # skip mutate
     toolbox.register("select", tools.selTournament, tournsize=3)
-    toolbox.register("evaluate", lambda individual:evaluate(individual, X, y, base_model))
+    evalfunc = lambda individual:evaluate(individual, X, y, base_model,
+        score_func, *args, **kwargs)
+    toolbox.register("evaluate", evalfunc)
     return toolbox
 
 def gawls(toolbox, n_populations=100, cxpb=0.5, n_generations=50):
@@ -55,23 +70,27 @@ def gawls(toolbox, n_populations=100, cxpb=0.5, n_generations=50):
 
 class GAWLS(BaseEstimator):
     def __init__(self, base_model, max_width=10, n_regions=3,
-        n_populations=100, n_generations=50):
+        n_populations=100, n_generations=50, optimization=OPT.MAXIMIZE,
+        score_func=r2_score):
         self.base_model = base_model
         self.best_model_ = deepcopy(base_model)
         self.n_regions = n_regions
         self.max_width = max_width
         self.n_populations = n_populations
         self.n_generations = n_generations
-    def fit(self, X, y):
-        creator_ = init_creator()
+        self.optimization_type = optimization
+        self.score_func = score_func
+    def fit(self, X, y, *args, **kwargs):
+        creator_ = init_creator(self.optimization_type)
         self.n_features = X.shape[1]
         toolbox_ = create_toolbox(creator_, self.max_width, self.n_features,
-            self.n_regions, X, y, self.base_model)
+            self.n_regions, X, y, self.base_model, self.score_func,
+            *args, **kwargs)# <- register evaulate
         self.pop = gawls(toolbox_, n_populations=self.n_populations,
             cxpb=0.5, n_generations=self.n_generations)
         fitnesses_ = np.array(list(map(toolbox_.evaluate, self.pop)))
-        logging.debug(f'Population: {self.pop}')
-        logging.debug('Best population: {}'.format(self.pop[fitnesses_.argmax()]))
+        logging.info(f'Population: {self.pop}')
+        logging.info(f'Best population: {self.pop[fitnesses_.argmax()]}')
         self.best_pop_ = self.pop[fitnesses_.argmax()]
         self.best_params_ = translate(self.best_pop_, self.n_features)
         self.best_model_.fit(X[:,self.best_params_], y)
