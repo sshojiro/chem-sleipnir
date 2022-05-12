@@ -55,5 +55,10 @@ def translate(chromosome, n_features):
 
 def evaluate(individual, X, y, model, score_func, *args, **kwargs):
     indexes = translate(individual, X.shape[1])
-    model.fit(X[:,indexes], y, *args, **kwargs)
-    return score_func(y, model.predict(X[:,indexes])),
+    if model.__class__.__name__ != 'IOTOptimizer':
+        model.fit(X[:,indexes], y, *args, **kwargs)
+    else:
+        # IOT family
+        model.set_params(wl_index=indexes)
+        model.fit(X, y, *args, **kwargs)
+    return score_func(y, model.predict(X)),
