@@ -27,7 +27,7 @@ def init_creator(optimization:OPT):
     return creator
 
 def create_toolbox(creator, max_width, n_features, n_regions, X, y, base_model,
-        score_func, *args, **kwargs):
+        score_func, index_keyword):
     toolbox = base.Toolbox()
     toolbox.register("attribute", lambda:generate_start_width(n_features, max_width))
     toolbox.register("individual", tools.initRepeat, creator.Individual,
@@ -38,7 +38,7 @@ def create_toolbox(creator, max_width, n_features, n_regions, X, y, base_model,
     # skip mutate
     toolbox.register("select", tools.selTournament, tournsize=3)
     evalfunc = lambda individual:evaluate(individual, X, y, base_model,
-        score_func, *args, **kwargs)
+        score_func, index_keyword)
     toolbox.register("evaluate", evalfunc)
     return toolbox
 
@@ -71,7 +71,7 @@ def gawls(toolbox, n_populations=100, cxpb=0.5, n_generations=50):
 class GAWLS(BaseEstimator):
     def __init__(self, base_model, max_width=10, n_regions=3,
         n_populations=100, n_generations=50, optimization=OPT.MAXIMIZE,
-        score_func=r2_score):
+        score_func=r2_score, index_keyword=None):
         self.base_model = base_model
         self.best_model_ = deepcopy(base_model)
         self.n_regions = n_regions
@@ -80,12 +80,12 @@ class GAWLS(BaseEstimator):
         self.n_generations = n_generations
         self.optimization_type = optimization
         self.score_func = score_func
-    def fit(self, X, y, *args, **kwargs):
+        self.index_keyword = index_keyword
+    def fit(self, X, y):
         creator_ = init_creator(self.optimization_type)
         self.n_features = X.shape[1]
         toolbox_ = create_toolbox(creator_, self.max_width, self.n_features,
-            self.n_regions, X, y, self.base_model, self.score_func,
-            *args, **kwargs)# <- register evaulate
+            self.n_regions, X, y, self.base_model, self.score_func, self.index_keyword)
         self.pop = gawls(toolbox_, n_populations=self.n_populations,
             cxpb=0.5, n_generations=self.n_generations)
         fitnesses_ = np.array(list(map(toolbox_.evaluate, self.pop)))
@@ -93,7 +93,24 @@ class GAWLS(BaseEstimator):
         logging.info(f'Best population: {self.pop[fitnesses_.argmax()]}')
         self.best_pop_ = self.pop[fitnesses_.argmax()]
         self.best_params_ = translate(self.best_pop_, self.n_features)
-        self.best_model_.fit(X[:,self.best_params_], y, *args, **kwargs)
+        if self.index_keyword is None:
+            self.best_model_.fit(X[:,self.best_params_], y)
+        else:
+            self.best_model_.set_params(**{self.index_keyword: self.best_params_})
+            self.best_model_.fit(X, y)
         return self
     def predict(self, data):
-        return self.base_model.predict(data[:,self.best_params_])
+        if self.index_keyword is None:
+            return self.best_model_.predict(data[:,self.best_params_])
+        else:
+            return self.best_model_.predict(data)
+    def transform(self, data):
+        if self.index_keyword is None:
+            return self.best_model_.transform(data[:,self.best_params_])
+        else:
+            return self.best_model_.transform(data)
+    def inverse_transform(self, Xt):
+        if self.index_keyword is None:
+            return self.best_model_.inverse_transform(Xt[:,self.best_params_])
+        else:
+            return self.best_model_.inverse_transform(Xt)
