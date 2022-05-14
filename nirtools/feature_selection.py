@@ -71,7 +71,7 @@ def gawls(toolbox, n_populations=100, cxpb=0.5, n_generations=50):
 class GAWLS(BaseEstimator):
     def __init__(self, base_model, max_width=10, n_regions=3,
         n_populations=100, n_generations=50, optimization=OPT.MAXIMIZE,
-        score_func=r2_score, index_keyword=None):
+        score_func=None, index_keyword=None):
         self.base_model = base_model
         self.best_model_ = deepcopy(base_model)
         self.n_regions = n_regions
