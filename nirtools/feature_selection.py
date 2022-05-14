@@ -93,7 +93,7 @@ class GAWLS(BaseEstimator):
         logging.info(f'Best population: {self.pop[fitnesses_.argmax()]}')
         self.best_pop_ = self.pop[fitnesses_.argmax()]
         self.best_params_ = translate(self.best_pop_, self.n_features)
-        self.best_model_.fit(X[:,self.best_params_], y)
+        self.best_model_.fit(X[:,self.best_params_], y, *args, **kwargs)
         return self
     def predict(self, data):
         return self.base_model.predict(data[:,self.best_params_])
