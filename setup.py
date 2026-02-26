@@ -6,7 +6,8 @@ install_requires = [
     "scipy>=1.5.4",
     "pandas==1.1.5",
     "tqdm>=4.54",
-    "scikit-learn>=0.23.1"
+    "scikit-learn>=0.23.1",
+    "deap>=1.3.0",
     ]
 
 packages = [
