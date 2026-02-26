@@ -8,6 +8,7 @@ install_requires = [
     "tqdm>=4.54",
     "scikit-learn>=0.23.1",
     "deap>=1.3.0",
+    "requests>=2.31.0"
     ]
 
 packages = [
